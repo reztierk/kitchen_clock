@@ -1,3 +1,7 @@
 secrets.py
 .env
 .DS_Store
+.vscode
+.metadata_never_index
+.Trashes
+.fseventsd

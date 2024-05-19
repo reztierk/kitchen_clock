@@ -148,7 +148,7 @@ def display_date_and_temp():
     info = f"{now.tm_mday}/{months[now.tm_mon-1]}"
 
     if outside_temp is not None:
-        info += f" {outside_temp}F"
+        info += f" {outside_temp}C"
     matrixportal._text_color[MSG_TXT_IDX] = week_days[now.tm_wday][1]
     _set_text_center(info, MSG_TXT_IDX)
 
@@ -480,6 +480,7 @@ def advance_img():
 mqtt_topic = secrets.get("topic_prefix") or "/matrixportal"
 mqtt_pub_status = f"{mqtt_topic}/status"
 
+
 mqtt_subs = {
     f"{mqtt_topic}/ping": _parse_ping,
     f"{mqtt_topic}/brightness": _parse_brightness,
@@ -487,7 +488,7 @@ mqtt_subs = {
     f"{mqtt_topic}/blinkrate": _parse_blinkrate,
     f"{mqtt_topic}/msg": _parse_msg_message,
     f"{mqtt_topic}/img": _parse_img,
-    "/aio/local_time": _parse_localtime_message,
+    "homeassistant/local_time": _parse_localtime_message,
     "/sensor/temperature_outside": _parse_temperature_outside,
 }
 
@@ -563,7 +564,6 @@ except Exception as e:
     # bye bye cruel world
     microcontroller.reset()
 
-
 # ------------- Screen elements ------------- #
 
 
@@ -614,7 +614,7 @@ def interval_send_status():
     }
     client.publish(mqtt_pub_status, json.dumps(value))
     print(f"send_status: {mqtt_pub_status}: {value}")
-
+    client.publish('homeassistant/local_time/refresh', 'refresh')
 
 def interval_led_blink():
     board_led.value = not board_led.value
