@@ -11,17 +11,20 @@ from collections import namedtuple
 import board
 import digitalio
 import displayio
+import terminalio
 import microcontroller
 import neopixel
 import rtc
 
 from microcontroller import watchdog as wd
 from watchdog import WatchDogMode
-import adafruit_esp32spi.adafruit_esp32spi_socket as socket
+import adafruit_connection_manager
 from adafruit_display_shapes.line import Line
-from adafruit_esp32spi import adafruit_esp32spi_wifimanager
+from adafruit_esp32spi import adafruit_esp32spi_wifimanager, adafruit_esp32spi
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
-from mini_matrixportal import MatrixPortal
+from adafruit_matrixportal.matrixportal import MatrixPortal
+import busio
+from digitalio import DigitalInOut
 from secrets import secrets
 
 ENABLE_DOG = True
@@ -29,13 +32,31 @@ MSG_TIME_IDX = 0
 MSG_TXT_IDX = 1
 
 dog_is_enabled = False
-matrixportal = MatrixPortal(debug=True)
 print("Connecting to WiFi...")
+# If you are using a board with pre-defined ESP32 Pins:
+esp32_cs = DigitalInOut(board.ESP_CS)
+esp32_ready = DigitalInOut(board.ESP_BUSY)
+esp32_reset = DigitalInOut(board.ESP_RESET)
+
+# If you have an externally connected ESP32:
+# esp32_cs = DigitalInOut(board.D9)
+# esp32_ready = DigitalInOut(board.D10)
+# esp32_reset = DigitalInOut(board.D5)
+
+# Secondary (SCK1) SPI used to connect to WiFi board on Arduino Nano Connect RP2040
+if "SCK1" in dir(board):
+    spi = busio.SPI(board.SCK1, board.MOSI1, board.MISO1)
+else:
+    spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
+esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
+
+matrixportal = MatrixPortal(debug=True, esp=esp)
+
 wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(
-    matrixportal._esp, secrets, None
+    esp, secrets, None
 )
 wifi.connect()
-print("My IP address is", matrixportal._esp.pretty_ip(matrixportal._esp.ip_address))
+print("My IP address is", wifi.ip_address)
 
 
 def run_once():
@@ -78,14 +99,14 @@ matrixportal.add_text(
     text_position=(0, 8),
     text_color=0xFFFFFF,
 )
-matrixportal.preload_font(b"0123456789:", TIME_FONT)
-matrixportal.set_text(" ", MSG_TIME_IDX)
+#matrixportal.preload_font(b"0123456789:", TIME_FONT)
+matrixportal.add_text(" ")#, MSG_TIME_IDX)
 
 # status/messages (ID = MSG_TXT_IDX)
 matrixportal.add_text(
     text_position=(0, 25),
 )
-matrixportal.set_text(" ", MSG_TXT_IDX)
+matrixportal.add_text(" ")#, MSG_TXT_IDX)
 
 SECS_COLOR = 0x404040
 SECS_WIDTH = 4
@@ -99,16 +120,16 @@ matrixportal.splash.append(seconds_line)
 def _set_text_center(val, index, text_color=None):
     pixels_used = 0
     for chararcter in val:
-        glyph = matrixportal._text[index]._font.get_glyph(ord(chararcter))
+        glyph = terminalio.FONT.get_glyph(ord(chararcter))
         pixels_used += glyph.shift_x
     if pixels_used >= matrixportal.display.width:
         new_x = 0
     else:
         new_x = int((matrixportal.display.width - pixels_used) / 2)
-    curr_y = matrixportal._text_position[index][1]
-    matrixportal.set_text(
+    curr_y = matrixportal._text[index]['position']
+    matrixportal.add_text(
         val,
-        index,
+        #index,
         text_color=text_color,
         scrolling=False,
         text_position=(new_x, curr_y),
@@ -148,8 +169,8 @@ def display_date_and_temp():
     info = f"{now.tm_mday}/{months[now.tm_mon-1]}"
 
     if outside_temp is not None:
-        info += f" {outside_temp}C"
-    matrixportal._text_color[MSG_TXT_IDX] = week_days[now.tm_wday][1]
+        info += f" {outside_temp}F"
+    matrixportal._text[MSG_TXT_IDX]["color"] = week_days[now.tm_wday][1]
     _set_text_center(info, MSG_TXT_IDX)
 
 
@@ -199,7 +220,7 @@ def one_sec_tick():
         curr_timeout = msg_state.get("timeout")
         if isinstance(curr_timeout, int):
             if curr_timeout <= 0:
-                matrixportal.set_text(val=" ", index=MSG_TXT_IDX, scrolling=False)
+                matrixportal.add_text(val=" ", scrolling=False)#index=MSG_TXT_IDX, scrolling=False)
                 display_needs_refresh = True
                 msg_state.clear()
             else:
@@ -378,14 +399,14 @@ def _parse_msg_message(topic, message):
         try:
             text_position = (
                 int(x_position),
-                matrixportal._text_position[MSG_TXT_IDX][1],
+                matrixportal._text[MSG_TXT_IDX]['position'],
             )
         except Exception as e:
             print(f"Failed to parse position {x_position}: {e}")
 
-    matrixportal.set_text(
+    matrixportal.add_text(
         val=msg_state.get("msg"),
-        index=MSG_TXT_IDX,
+        #index=MSG_TXT_IDX,
         text_color=msg_state.get("text_color"),
         scrolling=scrolling,
         text_position=text_position,
@@ -459,8 +480,8 @@ def _parse_img(_topic, message=""):
         img_only = True
     img_state["img_only"] = img_only
     if img_only:
-        matrixportal.set_text(" ", MSG_TIME_IDX)
-        matrixportal.set_text(" ", MSG_TXT_IDX)
+        matrixportal.add_text(" ")#, MSG_TIME_IDX)
+        matrixportal.add_text(" ")#, MSG_TXT_IDX)
         if seconds_index is not None:
             # Clear seconds line
             matrixportal.splash[seconds_index] = Line(0, 1, 0, 1, 0x00)
@@ -479,7 +500,6 @@ def advance_img():
 
 mqtt_topic = secrets.get("topic_prefix") or "/matrixportal"
 mqtt_pub_status = f"{mqtt_topic}/status"
-
 
 mqtt_subs = {
     f"{mqtt_topic}/ping": _parse_ping,
@@ -536,7 +556,8 @@ def message(_client, topic, message):
 
 # Initialize MQTT interface with the esp interface
 # MQTT.set_socket(socket, matrixportal.network._wifi.esp)
-MQTT.set_socket(socket, matrixportal._esp)
+#MQTT.https(socket, matrixportal._esp)
+pool = adafruit_connection_manager.get_radio_socketpool(esp)
 
 # Set up a MiniMQTT Client
 client = MQTT.MQTT(
@@ -544,9 +565,10 @@ client = MQTT.MQTT(
     port=secrets.get("broker_port") or 1883,
     username=secrets["broker_user"],
     password=secrets["broker_pass"],
+    socket_pool=pool,
 )
-client.attach_logger()
-client.set_logger_level("DEBUG")
+#client.attach_logger()
+#client.set_logger_level("DEBUG")
 
 # Connect callback handlers to client
 client.on_connect = connect
@@ -563,6 +585,7 @@ except Exception as e:
     time.sleep(120)
     # bye bye cruel world
     microcontroller.reset()
+
 
 # ------------- Screen elements ------------- #
 
@@ -656,7 +679,7 @@ now = t0
 while True:
     try:
         if (
-            not client.loop()
+            not client.loop(timeout=2)
             and matrixportal._scrolling_index is None
             and not img_state
         ):
