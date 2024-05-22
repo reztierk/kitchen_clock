@@ -1,24 +1,47 @@
 import time
 
 from adafruit_display_shapes.line import Line
+from adafruit_matrixportal.matrixportal import MatrixPortal
 
 import clock.shared as Shared
 
 
 def setup():
-    global seconds_index, seconds_line
-    seconds_line = Line(
-        0, 0, Shared.matrixportal.display.width, Shared.matrixportal.display.height, 0xFF0000
+    Shared.matrixportal = MatrixPortal(debug=True, esp=Shared.esp)
+
+    Shared.seconds_line = Line(
+        0,
+        0,
+        Shared.matrixportal.display.width,
+        Shared.matrixportal.display.height,
+        0xFF0000,
     )
-    seconds_index = len(Shared.matrixportal.splash)
+    Shared.matrixportal.add_text(
+        text_font=Shared.TIME_FONT,
+        text_position=Shared.MSG_POS[Shared.MSG_TIME_IDX],
+        text_color=0xFFFFFF,
+    )
+    Shared.matrixportal.preload_font(b"0123456789:")
+    Shared.matrixportal.set_text(" ", Shared.MSG_TIME_IDX)
+
+    # status/messages (ID = MSG_TXT_IDX)
+    Shared.matrixportal.add_text(
+        text_position=Shared.MSG_POS[Shared.MSG_TXT_IDX],
+    )
+    Shared.matrixportal.set_text(" ", Shared.MSG_TXT_IDX)
+
+    Shared.seconds_index = len(Shared.matrixportal.splash)
+    Shared.matrixportal.splash.append(Shared.seconds_line)
 
     set_brightness("on")
-    
+
 
 def set_text_center(val, index, text_color=None):
     pixels_used = 0
     for chararcter in val:
-        glyph = Shared.matrixportal._text[index]["label"]._font.get_glyph(ord(chararcter))
+        glyph = Shared.matrixportal._text[index]["label"]._font.get_glyph(
+            ord(chararcter)
+        )
         pixels_used += glyph.shift_x
     if pixels_used >= Shared.matrixportal.display.width:
         new_x = 0
@@ -28,13 +51,12 @@ def set_text_center(val, index, text_color=None):
     Shared.matrixportal._text[index]["scrolling"] = False
     Shared.matrixportal._text[index]["position"] = (new_x, Shared.MSG_POS[index][1])
     Shared.matrixportal.set_text(val, index)
+
     if text_color is not None:
         Shared.matrixportal.set_text_color(text_color, index)
 
 
 def show_date_and_temp():
-    global outside_temp
-
     # roycbiv: https://en.m.wikipedia.org/wiki/ROYGBIV
     now = Shared.global_rtc.datetime
     week_days = [
@@ -61,11 +83,10 @@ def show_date_and_temp():
         "Dec",
     ]
 
-    # info = f"{week_days[now.tm_wday][0]}|{months[now.tm_mon-1]}{now.tm_mday:02}"
     info = f"{now.tm_mday}/{months[now.tm_mon-1]}"
 
-    if outside_temp is not None:
-        info += f" {outside_temp}C"
+    if Shared.outside_temp is not None:
+        info += f" {Shared.outside_temp}C"
 
     set_text_center(info, Shared.MSG_TXT_IDX, week_days[now.tm_wday][1])
 
@@ -80,9 +101,10 @@ def _pretty_hour(hour):
 
 def main():
     now = Shared.global_rtc.datetime
-    Shared.matrixportal.splash[seconds_index] = Line(
+    Shared.matrixportal.splash[Shared.seconds_index] = Line(
         now.tm_sec, 1, now.tm_sec + Shared.SECS_WIDTH, 1, Shared.SECS_COLOR
     )
+
     if "local_time" not in Shared.counters:
         set_text_center(str(int(time.monotonic())), Shared.MSG_TIME_IDX)
         return
@@ -98,9 +120,8 @@ def main():
     Shared.cached_mins = now.tm_min
     Shared.display_needs_refresh = False
 
-def set_brightness(val):
-    global display_needs_refresh
 
+def set_brightness(val):
     """Adjust the TFT backlight.
     :param val: The backlight brightness. Use a value between ``0`` and ``1``, where ``0`` is
                 off, and ``1`` is 100% brightness. Can also be 'on' or 'off'

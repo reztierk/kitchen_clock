@@ -1,14 +1,13 @@
 import time
-import microcontroller
-import adafruit_connection_manager
-import adafruit_minimqtt.adafruit_minimqtt as MQTT
 from secrets import secrets  # type: ignore
 
-import clock.shared as Shared
+import adafruit_connection_manager
+import adafruit_minimqtt.adafruit_minimqtt as MQTT
+import microcontroller
+
 import clock.parse as Parse
+import clock.shared as Shared
 import clock.stats as Stats
-
-
 
 mqtt_subs = {
     f"{Shared.topic_prefix}/ping": Parse.ping,
@@ -21,6 +20,7 @@ mqtt_subs = {
     "/sensor/temperature_outside": Parse.temperature_outside,
 }
 
+
 def getMQTTClient():
     # Initialize MQTT interface with the esp interface
     socket_pool = adafruit_connection_manager.get_radio_socketpool(Shared.esp)
@@ -29,7 +29,7 @@ def getMQTTClient():
     client = MQTT.MQTT(
         broker=secrets["broker"],
         port=secrets.get("broker_port") or 1883,
-        username=secrets ["broker_user"],
+        username=secrets["broker_user"],
         password=secrets["broker_pass"],
         socket_pool=socket_pool,
         socket_timeout=0.5,
@@ -45,7 +45,22 @@ def getMQTTClient():
     return client
 
 
+def setup():
+    Shared.client = getMQTTClient()
+
+    print(f"Attempting to MQTT connect to {Shared.client.broker}")
+    try:
+        Shared.client.connect()
+        Stats.inc_counter("connect")
+    except Exception as e:
+        print(f"FATAL! Unable to MQTT connect to {Shared.client.broker}: {e}")
+        time.sleep(120)
+        # bye bye cruel world
+        microcontroller.reset()
+
+
 # ------------- MQTT Functions ------------- #
+
 
 # Define callback methods which are called when events occur
 # pylint: disable=unused-argument, redefined-outer-name

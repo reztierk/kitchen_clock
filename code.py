@@ -1,2 +1,2 @@
-import clock.main
+import clock.main  # noqa: F401
 

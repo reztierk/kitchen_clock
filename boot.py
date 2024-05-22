@@ -1,9 +1,12 @@
-import storage, usb_cdc
-import usb_hid
-import board, digitalio
 import time
-import usb_midi
+
+import board
+import digitalio
 import neopixel
+import storage
+import usb_cdc
+import usb_hid
+import usb_midi
 
 buttonpins = (board.BUTTON_DOWN, board.BUTTON_UP)
 buttons = []
@@ -31,6 +34,3 @@ if not buttons_pressed:
     storage.disable_usb_drive()
     usb_cdc.enable(console=False, data=False)
     usb_hid.disable()
-
-
-

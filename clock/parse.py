@@ -1,17 +1,17 @@
 import json
 import os
 import time
-import displayio
 
+import displayio
 from adafruit_display_shapes.line import Line
 
-import clock.shared as Shared
-import clock.intervals as Intervals
-import clock.stats as Stats
 import clock.display as Display
+import clock.shared as Shared
+import clock.stats as Stats
+
 
 def ping(_topic, _message):
-    Intervals.tss["send_status"] = None  # clear to force send status now
+    Shared.tss["send_status"] = None  # clear to force send status now
     Stats.inc_counter("ping")
 
 
@@ -22,19 +22,24 @@ def brightness(topic, message):
 
 
 def neopixel(_topic, message):
-    global pixels
     try:
         value = int(message)
     except ValueError as e:
         print(f"bad neo value: {e}")
         return
-    pixels[0] = ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
+    Shared.pixels[0] = ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
     Stats.inc_counter("neo")
 
 
 def blinkrate(_topic, message):
     message = message.lower()
-    value_map = {"off": 0, "no": 0, "on": None, "yes": None, "": Intervals.LED_BLINK_DEFAULT}
+    value_map = {
+        "off": 0,
+        "no": 0,
+        "on": None,
+        "yes": None,
+        "": Shared.LED_BLINK_DEFAULT,
+    }
     try:
         if message.startswith("-") or message in value_map:
             value = value_map.get(message)
@@ -45,13 +50,15 @@ def blinkrate(_topic, message):
         return
 
     if value:
-        Intervals.TS_INTERVALS[Intervals.LED_BLINK] = Intervals.TS(value, Intervals.interval_led_blink)
-        Intervals.tss[Intervals.LED_BLINK] = None
+        Shared.TS_INTERVALS[Shared.LED_BLINK] = Shared.TS(
+            value, Shared.interval_led_blink
+        )
+        Shared.tss[Shared.LED_BLINK] = None
     else:
         # Stop blinking. Turn off if value is 0. Turn on if value is None.
         try:
-            del Intervals.TS_INTERVALS[Intervals.LED_BLINK]
-            del Intervals.tss[Intervals.LED_BLINK]
+            del Shared.TS_INTERVALS[Shared.LED_BLINK]
+            del Shared.tss[Shared.LED_BLINK]
         except KeyError:
             pass
         Shared.board_led.value = value is None
@@ -87,7 +94,6 @@ def temperature_outside(topic, message):
 
 
 def msg_message(topic, message):
-
     print(f"msg_message: {message}")
     Stats.inc_counter("msg_message")
     try:
@@ -133,12 +139,18 @@ def msg_message(topic, message):
 
     Shared.matrixportal._text[Shared.MSG_TXT_IDX]["scrolling"] = scrolling
     if Shared.matrixportal._scrolling_index is None and scrolling:
-        Shared.matrixportal._scrolling_index = Shared.matrixportal._get_next_scrollable_text_index()
+        Shared.matrixportal._scrolling_index = (
+            Shared.matrixportal._get_next_scrollable_text_index()
+        )
 
     Shared.matrixportal._text[Shared.MSG_TXT_IDX]["position"] = text_position
-    Shared.matrixportal.set_text(val=Shared.msg_state.get("msg"), index=Shared.MSG_TXT_IDX)
+    Shared.matrixportal.set_text(
+        val=Shared.msg_state.get("msg"), index=Shared.MSG_TXT_IDX
+    )
     if Shared.msg_state.get("text_color") is not None:
-        Shared.matrixportal.set_text_color(Shared.msg_state.get("text_color"), Shared.MSG_TXT_IDX)
+        Shared.matrixportal.set_text_color(
+            Shared.msg_state.get("text_color"), Shared.MSG_TXT_IDX
+        )
 
 
 def img(_topic, message=""):
@@ -177,7 +189,9 @@ def img(_topic, message=""):
     print(f"opening image: {filename}")
     Shared.img_state["img_file"] = open(filename, "rb")
     img_bitmap = displayio.OnDiskBitmap(Shared.img_state["img_file"])
-    Shared.img_state["img_frame_count"] = int(img_bitmap.height / Shared.matrixportal.display.height)
+    Shared.img_state["img_frame_count"] = int(
+        img_bitmap.height / Shared.matrixportal.display.height
+    )
     img_sprite = displayio.TileGrid(
         img_bitmap,
         pixel_shader=getattr(img_bitmap, "pixel_shader", displayio.ColorConverter()),
@@ -206,4 +220,3 @@ def img(_topic, message=""):
         if Shared.seconds_index is not None:
             # Clear seconds line
             Shared.matrixportal.splash[Shared.seconds_index] = Line(0, 1, 0, 1, 0x00)
-
