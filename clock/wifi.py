@@ -5,6 +5,7 @@ import busio
 from adafruit_esp32spi import adafruit_esp32spi, adafruit_esp32spi_wifimanager
 from digitalio import DigitalInOut
 
+import clock.dog as Dog
 import clock.shared as Shared
 
 
@@ -18,9 +19,28 @@ def setup():
         spi, esp32_cs, esp32_ready, esp32_reset
     )
     Shared.wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(
-        Shared.esp, secrets, None
+        Shared.esp, secrets, None, attempts=1
     )
 
     print("Connecting to WiFi...")
     Shared.wifi.connect()
-    print("My IP address is", Shared.wifi.ip_address)
+    try:
+        print("My IP address is", Shared.wifi.ip_address())
+    except Exception as e:
+        print(f"Could not get IP address: {e}")
+
+
+def ensure_connected():
+    if not Shared.esp.is_connected:
+        print("WiFi lost, attempting reconnect...")
+        Dog.feed()
+        try:
+            Shared.wifi.connect()
+            Dog.feed()
+            print("Reconnected to WiFi, IP:", Shared.wifi.ip_address())
+            return True
+        except Exception as e:
+            Dog.feed()
+            print(f"Failed to reconnect WiFi: {e}")
+            return False
+    return True

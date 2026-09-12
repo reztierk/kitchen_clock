@@ -32,5 +32,5 @@ if not buttons_pressed:
     # Disable devices only if button is not pressed.
     usb_midi.disable()
     storage.disable_usb_drive()
-    usb_cdc.enable(console=False, data=False)
+    usb_cdc.enable(console=True, data=False)
     usb_hid.disable()

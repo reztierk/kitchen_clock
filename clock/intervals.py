@@ -2,21 +2,38 @@ import gc
 import json
 import time
 
-from microcontroller import watchdog as wd
-
 import clock.display as Display
+import clock.dog as Dog
+import clock.mqtt as MQTT
 import clock.parse as Parse
 import clock.shared as Shared
+import clock.stats as Stats
 
 # ------------- Iteration routines ------------- #
 
 
 def interval_one_sec():
-    if Shared.dog_is_enabled:
-        wd.feed()
+    Dog.feed()
 
-    if Shared.matrixportal._scrolling_index is None and not Shared.img_state:
-        Shared.client.loop(0.5)
+    # Process MQTT messages (non-blocking, keeps connection alive even while scrolling)
+    try:
+        if Shared.client and Shared.client.is_connected():
+            Shared.client.loop(timeout=0.1)
+        elif Shared.client:
+            MQTT.reconnect()
+    except Exception as e:
+        print(f"MQTT loop/reconnect error: {e}")
+        Stats.inc_counter("fail_loop")
+
+    # If time has not synced yet, periodically request it
+    if "local_time" not in Shared.counters:
+        if int(time.monotonic()) % 10 == 0:
+            try:
+                if Shared.client and Shared.client.is_connected():
+                    print("Requesting time sync...")
+                    Shared.client.publish("homeassistant/local_time/refresh", "refresh")
+            except Exception:
+                pass
 
     # Manage timeouts
     if Shared.msg_state:
@@ -31,11 +48,13 @@ def interval_one_sec():
             else:
                 Shared.msg_state["timeout"] = curr_timeout - 1
 
-    if Shared.img_state is not None:
+    if Shared.img_state:
         curr_timeout = Shared.img_state.get("timeout")
         if isinstance(curr_timeout, int):
             if curr_timeout <= 0:
                 Parse.img(None, message="")
+                if Shared.seconds_line is not None:
+                    Shared.seconds_line.hidden = False
             else:
                 Shared.img_state["timeout"] = curr_timeout - 1
 
@@ -48,6 +67,10 @@ def interval_one_sec():
             Shared.matrixportal.scroll()
 
         Display.main()
+
+    # Periodic garbage collection once a minute to prevent heap fragmentation
+    if Shared.global_rtc.datetime.tm_sec == 0:
+        gc.collect()
 
 
 def advance_img():
@@ -74,16 +97,28 @@ def interval_one_decasec():
 
 
 def interval_send_status():
+    ip = None
+    try:
+        if Shared.esp and Shared.esp.is_connected and Shared.wifi:
+            ip = Shared.wifi.ip_address()
+    except Exception as e:
+        print(f"send_status: could not read IP: {e}")
+
     value = {
         "uptime_mins": int(time.monotonic() - Shared.start_time) // 60,
         "brightness": Shared.matrixportal.display.brightness,
-        "ip": Shared.wifi.ip_address(),
+        "ip": str(ip),
         "counters": str(Shared.counters),
         "mem_free": gc.mem_free(),
     }
-    Shared.client.publish(Shared.pub_status_topic, json.dumps(value))
     print(f"send_status: {Shared.pub_status_topic}: {value}")
-    Shared.client.publish("homeassistant/local_time/refresh", "refresh")
+    try:
+        if Shared.client and Shared.client.is_connected():
+            Shared.client.publish(Shared.pub_status_topic, json.dumps(value))
+            Shared.client.publish("homeassistant/local_time/refresh", "refresh")
+    except Exception as e:
+        print(f"send_status: publish failed: {e}")
+    gc.collect()
 
 
 def interval_led_blink():

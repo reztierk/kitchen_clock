@@ -9,13 +9,6 @@ import clock.shared as Shared
 def setup():
     Shared.matrixportal = MatrixPortal(debug=True, esp=Shared.esp)
 
-    Shared.seconds_line = Line(
-        0,
-        0,
-        Shared.matrixportal.display.width,
-        Shared.matrixportal.display.height,
-        0xFF0000,
-    )
     Shared.matrixportal.add_text(
         text_font=Shared.TIME_FONT,
         text_position=Shared.MSG_POS[Shared.MSG_TIME_IDX],
@@ -30,6 +23,15 @@ def setup():
     )
     Shared.matrixportal.set_text(" ", Shared.MSG_TXT_IDX)
 
+    Shared.seconds_line = Line(
+        0,
+        0,
+        Shared.SECS_WIDTH,
+        0,
+        Shared.SECS_COLOR,
+    )
+    Shared.seconds_line.y = 1
+    Shared.seconds_line.x = 0
     Shared.seconds_index = len(Shared.matrixportal.splash)
     Shared.matrixportal.splash.append(Shared.seconds_line)
 
@@ -38,11 +40,13 @@ def setup():
 
 def set_text_center(val, index, text_color=None):
     pixels_used = 0
-    for chararcter in val:
-        glyph = Shared.matrixportal._text[index]["label"]._font.get_glyph(
-            ord(chararcter)
-        )
-        pixels_used += glyph.shift_x
+    font = Shared.matrixportal._text[index]["label"]._font
+    for character in val:
+        glyph = font.get_glyph(ord(character))
+        if glyph:
+            pixels_used += glyph.shift_x
+        else:
+            pixels_used += 6
     if pixels_used >= Shared.matrixportal.display.width:
         new_x = 0
     else:
@@ -101,9 +105,11 @@ def _pretty_hour(hour):
 
 def main():
     now = Shared.global_rtc.datetime
-    Shared.matrixportal.splash[Shared.seconds_index] = Line(
-        now.tm_sec, 1, now.tm_sec + Shared.SECS_WIDTH, 1, Shared.SECS_COLOR
-    )
+    if Shared.seconds_line is not None and not Shared.img_state.get("img_only"):
+        Shared.seconds_line.hidden = False
+        Shared.seconds_line.x = min(
+            now.tm_sec, Shared.matrixportal.display.width - Shared.SECS_WIDTH - 1
+        )
 
     if "local_time" not in Shared.counters:
         set_text_center(str(int(time.monotonic())), Shared.MSG_TIME_IDX)

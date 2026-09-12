@@ -4,6 +4,8 @@
 
 import time
 
+import microcontroller
+
 import clock.display as Display
 import clock.dog as Dog
 import clock.intervals as Intervals
@@ -12,6 +14,9 @@ import clock.mqtt as MQTT
 import clock.shared as Shared
 import clock.stats as Stats
 import clock.wifi as Wifi
+
+if hasattr(microcontroller, "cpu") and hasattr(microcontroller.cpu, "reset_reason"):
+    print(f"Board reset reason: {microcontroller.cpu.reset_reason}")
 
 Wifi.setup()
 Display.setup()
@@ -31,6 +36,7 @@ Intervals.setup(
 
 # ------------- Main loop ------------- #
 while True:
+    Dog.feed()
     now = time.monotonic()
     for ts_interval in Shared.TS_INTERVALS:
         if (
@@ -47,13 +53,19 @@ while True:
                     pass
                 Shared.TS_INTERVALS[ts_interval].fun()
             except (ValueError, RuntimeError) as e:
-                print(f"Error in {ts_interval}, retrying in 10s: {e}")
-                Shared.tss[ts_interval] = (
-                    now - Shared.TS_INTERVALS[ts_interval].interval
-                ) + 10
+                print(f"Error in {ts_interval}: {e}")
                 Stats.inc_counter("fail_runtime")
-                continue
+                if Shared.TS_INTERVALS[ts_interval].interval >= 10:
+                    Shared.tss[ts_interval] = (
+                        now - Shared.TS_INTERVALS[ts_interval].interval
+                    ) + 30
+                    continue
             except Exception as e:
                 print(f"Failed {ts_interval}: {e}")
                 Stats.inc_counter("fail_other")
+                if Shared.TS_INTERVALS[ts_interval].interval >= 10:
+                    Shared.tss[ts_interval] = (
+                        now - Shared.TS_INTERVALS[ts_interval].interval
+                    ) + 30
+                    continue
             Shared.tss[ts_interval] = time.monotonic()

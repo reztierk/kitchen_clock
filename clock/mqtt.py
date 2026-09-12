@@ -5,9 +5,11 @@ import adafruit_connection_manager
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import microcontroller
 
+import clock.dog as Dog
 import clock.parse as Parse
 import clock.shared as Shared
 import clock.stats as Stats
+import clock.wifi as Wifi
 
 mqtt_subs = {
     f"{Shared.topic_prefix}/ping": Parse.ping,
@@ -16,6 +18,7 @@ mqtt_subs = {
     f"{Shared.topic_prefix}/blinkrate": Parse.blinkrate,
     f"{Shared.topic_prefix}/msg": Parse.msg_message,
     f"{Shared.topic_prefix}/img": Parse.img,
+    "/aio/local_time": Parse.localtime_message,
     "homeassistant/local_time": Parse.localtime_message,
     "/sensor/temperature_outside": Parse.temperature_outside,
 }
@@ -32,7 +35,7 @@ def getMQTTClient():
         username=secrets["broker_user"],
         password=secrets["broker_pass"],
         socket_pool=socket_pool,
-        socket_timeout=0.5,
+        socket_timeout=0.05,
     )
 
     # Connect callback handlers to client
@@ -54,7 +57,7 @@ def setup():
         Stats.inc_counter("connect")
     except Exception as e:
         print(f"FATAL! Unable to MQTT connect to {Shared.client.broker}: {e}")
-        time.sleep(120)
+        time.sleep(10)
         # bye bye cruel world
         microcontroller.reset()
 
@@ -74,19 +77,46 @@ def connect(client, userdata, flags, rc):
         print(f"Subscribing to {mqtt_sub}")
         client.subscribe(mqtt_sub)
     Stats.inc_counter("connect")
-
-
-def reconnect(client, e):
-    print(f"Failed mqtt loop: {e}")
-    Stats.inc_counter("fail_loop")
-    time.sleep(3)
+    # Trigger local time refresh immediately upon connection
     try:
-        client.disconnect()
-        client.connect()
+        print("Requesting time sync...")
+        client.publish("homeassistant/local_time/refresh", "refresh")
     except Exception as e:
-        # bye bye cruel world
-        print(f"FATAL! Failed reconnect: {e}")
-        microcontroller.reset()
+        print(f"Error requesting time refresh: {e}")
+
+
+last_reconnect_attempt = 0
+
+
+def reconnect():
+    global last_reconnect_attempt
+    now = time.monotonic()
+    if now - last_reconnect_attempt < 5:
+        return False
+    last_reconnect_attempt = now
+
+    if not Wifi.ensure_connected():
+        return False
+
+    print("Attempting MQTT reconnect...")
+    Dog.feed()
+    try:
+        Shared.client.disconnect()
+    except Exception:
+        pass
+
+    try:
+        Dog.feed()
+        Shared.client.connect()
+        Dog.feed()
+        print("MQTT reconnected successfully!")
+        Stats.inc_counter("reconnect")
+        return True
+    except Exception as err:
+        Dog.feed()
+        print(f"MQTT reconnect failed: {err}")
+        Stats.inc_counter("fail_reconnect")
+        return False
 
 
 def disconnected(_client, _userdata, rc):

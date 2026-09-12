@@ -66,22 +66,32 @@ def blinkrate(_topic, message):
 
 
 def localtime_message(topic, message):
-    # /aio/local_time : 2021-01-15 23:07:36.339 015 5 -0500 EST
+    # Formats supported:
+    # 1) /aio/local_time or homeassistant/local_time:
+    #    "2021-01-15 23:07:36.339 015 5 -0500 EST"
+    # 2) ISO-8601: "2024-04-16T15:30:00" or "2024-04-16 15:30:00"
     try:
         print(f"Local time mqtt: {message}")
-        times = message.split(" ")
+        msg = message.strip()
+        times = msg.split(" ")
         the_date = times[0]
-        the_time = times[1]
-        year_day = int(times[2])
-        week_day = int(times[3])
-        is_dst = None  # no way to know yet
+        the_time = times[1] if len(times) > 1 else ""
+
+        if "T" in the_date and not the_time:
+            the_date, the_time = the_date.split("T")
+
+        year_day = int(times[2]) if len(times) > 2 else -1
+        week_day = int(times[3]) if len(times) > 3 else -1
+        is_dst = -1
+
         year, month, mday = [int(x) for x in the_date.split("-")]
-        the_time = the_time.split(".")[0]
+        the_time = the_time.split(".")[0].split("+")[0].split("Z")[0]
         hours, minutes, seconds = [int(x) for x in the_time.split(":")]
         now = time.struct_time(
             (year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst)
         )
         Shared.global_rtc.datetime = now
+        Shared.display_needs_refresh = True
         Stats.inc_counter("local_time")
     except Exception as e:
         print("Error in _parse_localtime_message -", e)
@@ -89,8 +99,11 @@ def localtime_message(topic, message):
 
 
 def temperature_outside(topic, message):
-    Shared.outside_temp = int(message)
-    Stats.inc_counter("outside_temp")
+    try:
+        Shared.outside_temp = int(round(float(message)))
+        Stats.inc_counter("outside_temp")
+    except (ValueError, TypeError) as e:
+        print(f"bad outside_temp {message}: {e}")
 
 
 def msg_message(topic, message):
@@ -217,6 +230,5 @@ def img(_topic, message=""):
     if img_only:
         Shared.matrixportal.set_text(" ", Shared.MSG_TIME_IDX)
         Shared.matrixportal.set_text(" ", Shared.MSG_TXT_IDX)
-        if Shared.seconds_index is not None:
-            # Clear seconds line
-            Shared.matrixportal.splash[Shared.seconds_index] = Line(0, 1, 0, 1, 0x00)
+        if Shared.seconds_line is not None:
+            Shared.seconds_line.hidden = True

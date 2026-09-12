@@ -25,3 +25,11 @@ def no_dog():
     except Exception as e:
         print(f"could not disable watchdog: {e}")
     return not Shared.dog_is_enabled
+
+
+def feed():
+    if Shared.dog_is_enabled:
+        try:
+            wd.feed()
+        except Exception:
+            pass
