@@ -23,11 +23,11 @@ def setup():
     )
 
     print("Connecting to WiFi...")
-    Shared.wifi.connect()
     try:
-        print("My IP address is", Shared.wifi.ip_address())
+        Shared.wifi.connect()
+        print("My IP address is", Shared.wifi.ip_address)
     except Exception as e:
-        print(f"Could not get IP address: {e}")
+        print(f"Initial WiFi connection failed: {e}")
 
 
 def ensure_connected():
@@ -37,7 +37,7 @@ def ensure_connected():
         try:
             Shared.wifi.connect()
             Dog.feed()
-            print("Reconnected to WiFi, IP:", Shared.wifi.ip_address())
+            print("Reconnected to WiFi, IP:", Shared.wifi.ip_address)
             return True
         except Exception as e:
             Dog.feed()

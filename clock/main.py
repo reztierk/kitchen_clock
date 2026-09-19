@@ -15,8 +15,12 @@ import clock.shared as Shared
 import clock.stats as Stats
 import clock.wifi as Wifi
 
+reset_reason_str = "UNKNOWN"
 if hasattr(microcontroller, "cpu") and hasattr(microcontroller.cpu, "reset_reason"):
-    print(f"Board reset reason: {microcontroller.cpu.reset_reason}")
+    reset_reason_str = str(microcontroller.cpu.reset_reason)
+    print(f"Board reset reason: {reset_reason_str}")
+Shared.reset_reason = reset_reason_str
+Stats.inc_counter(f"boot_{reset_reason_str}")
 
 Wifi.setup()
 Display.setup()
@@ -36,36 +40,41 @@ Intervals.setup(
 
 # ------------- Main loop ------------- #
 while True:
-    Dog.feed()
-    now = time.monotonic()
-    for ts_interval in Shared.TS_INTERVALS:
-        if (
-            not Shared.tss[ts_interval]
-            or now > Shared.tss[ts_interval] + Shared.TS_INTERVALS[ts_interval].interval
-        ):
-            try:
-                if Shared.TS_INTERVALS[ts_interval].interval >= 60:
-                    lt = time.localtime()
-                    print(
-                        f"{lt.tm_hour}:{lt.tm_min}:{lt.tm_sec} Interval {ts_interval} triggered"
-                    )
-                else:
-                    pass
-                Shared.TS_INTERVALS[ts_interval].fun()
-            except (ValueError, RuntimeError) as e:
-                print(f"Error in {ts_interval}: {e}")
-                Stats.inc_counter("fail_runtime")
-                if Shared.TS_INTERVALS[ts_interval].interval >= 10:
-                    Shared.tss[ts_interval] = (
-                        now - Shared.TS_INTERVALS[ts_interval].interval
-                    ) + 30
-                    continue
-            except Exception as e:
-                print(f"Failed {ts_interval}: {e}")
-                Stats.inc_counter("fail_other")
-                if Shared.TS_INTERVALS[ts_interval].interval >= 10:
-                    Shared.tss[ts_interval] = (
-                        now - Shared.TS_INTERVALS[ts_interval].interval
-                    ) + 30
-                    continue
-            Shared.tss[ts_interval] = time.monotonic()
+    try:
+        Dog.feed()
+        now = time.monotonic()
+        for ts_interval in list(Shared.TS_INTERVALS):
+            if ts_interval not in Shared.TS_INTERVALS:
+                continue
+            interval_obj = Shared.TS_INTERVALS[ts_interval]
+            last_ts = Shared.tss.get(ts_interval)
+            if not last_ts or now > last_ts + interval_obj.interval:
+                try:
+                    if interval_obj.interval >= 60:
+                        lt = time.localtime()
+                        print(
+                            f"{lt.tm_hour}:{lt.tm_min}:{lt.tm_sec} Interval {ts_interval} triggered"
+                        )
+                    interval_obj.fun()
+                except (ValueError, RuntimeError) as e:
+                    print(f"Error in {ts_interval}: {e}")
+                    Stats.inc_counter("fail_runtime")
+                    if interval_obj.interval >= 10:
+                        Shared.tss[ts_interval] = (
+                            now - interval_obj.interval
+                        ) + 30
+                        continue
+                except Exception as e:
+                    print(f"Failed {ts_interval}: {e}")
+                    Stats.inc_counter("fail_other")
+                    if interval_obj.interval >= 10:
+                        Shared.tss[ts_interval] = (
+                            now - interval_obj.interval
+                        ) + 30
+                        continue
+                Shared.tss[ts_interval] = time.monotonic()
+    except Exception as e:
+        print(f"Unhandled exception in main loop: {e}")
+        Stats.inc_counter("fail_main_loop")
+        time.sleep(0.5)
+        Dog.feed()

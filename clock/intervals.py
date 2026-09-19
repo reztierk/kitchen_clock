@@ -15,10 +15,23 @@ import clock.stats as Stats
 def interval_one_sec():
     Dog.feed()
 
-    # Process MQTT messages (non-blocking, keeps connection alive even while scrolling)
+    # Process MQTT messages (non-blocking when scrolling, responsive when messages arrive)
     try:
         if Shared.client and Shared.client.is_connected():
-            Shared.client.loop(timeout=0.1)
+            sock = getattr(Shared.client, "_sock", None)
+            has_data = False
+            if sock and hasattr(sock, "_available"):
+                try:
+                    avail = sock._available()
+                    has_data = avail is not None and avail > 0
+                except Exception:
+                    has_data = True
+            else:
+                has_data = True
+
+            is_scrolling = Shared.matrixportal._scrolling_index is not None
+            if has_data or not is_scrolling:
+                Shared.client.loop(timeout=1.0)
         elif Shared.client:
             MQTT.reconnect()
     except Exception as e:
@@ -97,10 +110,11 @@ def interval_one_decasec():
 
 
 def interval_send_status():
+    Dog.feed()
     ip = None
     try:
         if Shared.esp and Shared.esp.is_connected and Shared.wifi:
-            ip = Shared.wifi.ip_address()
+            ip = Shared.wifi.ip_address
     except Exception as e:
         print(f"send_status: could not read IP: {e}")
 
@@ -110,6 +124,7 @@ def interval_send_status():
         "ip": str(ip),
         "counters": str(Shared.counters),
         "mem_free": gc.mem_free(),
+        "reset_reason": str(getattr(Shared, "reset_reason", "unknown")),
     }
     print(f"send_status: {Shared.pub_status_topic}: {value}")
     try:
@@ -118,6 +133,7 @@ def interval_send_status():
             Shared.client.publish("homeassistant/local_time/refresh", "refresh")
     except Exception as e:
         print(f"send_status: publish failed: {e}")
+    Dog.feed()
     gc.collect()
 
 

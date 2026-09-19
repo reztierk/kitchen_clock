@@ -6,7 +6,7 @@ import board
 import digitalio
 import rtc
 
-ENABLE_DOG = True
+ENABLE_DOG = secrets.get("enable_dog", True)
 MSG_TIME_IDX = 0
 MSG_TXT_IDX = 1
 MSG_POS = [(0, 5), (0, 26)]
@@ -42,3 +42,4 @@ start_time = time.monotonic()
 board_led = digitalio.DigitalInOut(board.L)  # Or board.D13
 topic_prefix = secrets.get("topic_prefix") or "/matrixportal"
 pub_status_topic = f"{topic_prefix}/status"
+reset_reason = None

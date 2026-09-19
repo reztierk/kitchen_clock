@@ -35,7 +35,8 @@ def getMQTTClient():
         username=secrets["broker_user"],
         password=secrets["broker_pass"],
         socket_pool=socket_pool,
-        socket_timeout=0.05,
+        socket_timeout=1.0,
+        connect_retries=1,
     )
 
     # Connect callback handlers to client
@@ -56,10 +57,9 @@ def setup():
         Shared.client.connect()
         Stats.inc_counter("connect")
     except Exception as e:
-        print(f"FATAL! Unable to MQTT connect to {Shared.client.broker}: {e}")
-        time.sleep(10)
-        # bye bye cruel world
-        microcontroller.reset()
+        print(f"Unable to connect to MQTT broker {Shared.client.broker} during setup: {e}")
+        print("Continuing boot; will retry connecting in background.")
+        Stats.inc_counter("fail_initial_connect")
 
 
 # ------------- MQTT Functions ------------- #
@@ -91,10 +91,11 @@ last_reconnect_attempt = 0
 def reconnect():
     global last_reconnect_attempt
     now = time.monotonic()
-    if now - last_reconnect_attempt < 5:
+    if now - last_reconnect_attempt < 10:
         return False
     last_reconnect_attempt = now
 
+    Dog.feed()
     if not Wifi.ensure_connected():
         return False
 

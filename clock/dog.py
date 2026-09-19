@@ -7,10 +7,11 @@ import clock.shared as Shared
 def setup():
     if Shared.ENABLE_DOG:
         print("--------------------------------------------------------")
-        print("IMPORTANT: watch dog is enabled! To disable it, do:")
+        print("IMPORTANT: watch dog is enabled! To disable it, set")
+        print("'enable_dog': False in secrets.py, or do:")
         print("from microcontroller import watchdog as wd ; wd.deinit()")
         print("--------------------------------------------------------")
-        wd.timeout = 15  # timeout in seconds
+        wd.timeout = 16  # timeout in seconds (SAMD51 max hardware timeout)
         wd.mode = WatchDogMode.RESET
         Shared.dog_is_enabled = True
     else:
@@ -20,11 +21,37 @@ def setup():
 
 def no_dog():
     try:
+        wd.mode = None
+    except Exception:
+        pass
+    try:
         wd.deinit()
-        Shared.dog_is_enabled = False
-    except Exception as e:
-        print(f"could not disable watchdog: {e}")
+    except Exception:
+        pass
+    Shared.dog_is_enabled = False
     return not Shared.dog_is_enabled
+
+
+def pause():
+    if Shared.dog_is_enabled:
+        try:
+            wd.mode = None
+        except Exception:
+            try:
+                wd.deinit()
+            except Exception:
+                pass
+
+
+def resume():
+    if Shared.ENABLE_DOG:
+        try:
+            feed()
+            wd.timeout = 16
+            wd.mode = WatchDogMode.RESET
+            Shared.dog_is_enabled = True
+        except Exception:
+            pass
 
 
 def feed():

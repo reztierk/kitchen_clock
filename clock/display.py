@@ -87,12 +87,14 @@ def show_date_and_temp():
         "Dec",
     ]
 
-    info = f"{now.tm_mday}/{months[now.tm_mon-1]}"
+    month_idx = max(0, min(11, now.tm_mon - 1)) if now.tm_mon else 0
+    info = f"{now.tm_mday}/{months[month_idx]}"
 
     if Shared.outside_temp is not None:
         info += f" {Shared.outside_temp}C"
 
-    set_text_center(info, Shared.MSG_TXT_IDX, week_days[now.tm_wday][1])
+    wday_idx = (now.tm_wday if (now.tm_wday is not None and 0 <= now.tm_wday < 7) else 0)
+    set_text_center(info, Shared.MSG_TXT_IDX, week_days[wday_idx][1])
 
 
 def _pretty_hour(hour):
