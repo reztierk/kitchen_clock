@@ -29,6 +29,15 @@ for button in buttons:
         buttons_pressed += 1
 
 if not buttons_pressed:
+    # Normal (deployed) run: no button held. Disable auto-reload so stray
+    # filesystem writes or serial events cannot restart code.py.
+    # (Hold a button at boot for dev mode, where autoreload stays enabled.)
+    try:
+        import supervisor
+
+        supervisor.runtime.autoreload = False
+    except Exception:
+        pass
     # Disable devices only if button is not pressed.
     usb_midi.disable()
     storage.disable_usb_drive()

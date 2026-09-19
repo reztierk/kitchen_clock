@@ -6,8 +6,10 @@ import clock.display as Display
 import clock.dog as Dog
 import clock.mqtt as MQTT
 import clock.parse as Parse
+import clock.reset_log as ResetLog
 import clock.shared as Shared
 import clock.stats as Stats
+import clock.wifi as Wifi
 
 # ------------- Iteration routines ------------- #
 
@@ -15,36 +17,29 @@ import clock.stats as Stats
 def interval_one_sec():
     Dog.feed()
 
-    # Process MQTT messages (non-blocking when scrolling, responsive when messages arrive)
+    # Process MQTT messages
     try:
         if Shared.client and Shared.client.is_connected():
-            sock = getattr(Shared.client, "_sock", None)
-            has_data = False
-            if sock and hasattr(sock, "_available"):
-                try:
-                    avail = sock._available()
-                    has_data = avail is not None and avail > 0
-                except Exception:
-                    has_data = True
-            else:
-                has_data = True
-
-            is_scrolling = Shared.matrixportal._scrolling_index is not None
-            if has_data or not is_scrolling:
-                Shared.client.loop(timeout=1.0)
+            Shared.client.loop(timeout=1.0)
         elif Shared.client:
             MQTT.reconnect()
     except Exception as e:
         print(f"MQTT loop/reconnect error: {e}")
         Stats.inc_counter("fail_loop")
 
+    now_mono = time.monotonic()
+    # Heartbeat to NVM every 10 seconds to track session length in case of reset
+    if int(now_mono) % 10 == 0:
+        ResetLog.heartbeat(int(now_mono - Shared.start_time))
+
     # If time has not synced yet, periodically request it
     if "local_time" not in Shared.counters:
-        if int(time.monotonic()) % 10 == 0:
+        if int(now_mono) % 10 == 0:
             try:
                 if Shared.client and Shared.client.is_connected():
                     print("Requesting time sync...")
                     Shared.client.publish("homeassistant/local_time/refresh", "refresh")
+                    Shared.client.publish(f"{Shared.topic_prefix}/time/refresh", "refresh")
             except Exception:
                 pass
 
@@ -111,26 +106,27 @@ def interval_one_decasec():
 
 def interval_send_status():
     Dog.feed()
-    ip = None
-    try:
-        if Shared.esp and Shared.esp.is_connected and Shared.wifi:
-            ip = Shared.wifi.ip_address
-    except Exception as e:
-        print(f"send_status: could not read IP: {e}")
-
+    ip = Wifi.get_ip()
+    recent_resets = ResetLog.get_recent_resets()
+    clean_reason = str(getattr(Shared, "reset_reason", "unknown")).replace("microcontroller.ResetReason.", "")
     value = {
         "uptime_mins": int(time.monotonic() - Shared.start_time) // 60,
         "brightness": Shared.matrixportal.display.brightness,
         "ip": str(ip),
         "counters": str(Shared.counters),
         "mem_free": gc.mem_free(),
-        "reset_reason": str(getattr(Shared, "reset_reason", "unknown")),
+        "reset_reason": clean_reason,
+        "recent_resets": recent_resets,
     }
     print(f"send_status: {Shared.pub_status_topic}: {value}")
     try:
         if Shared.client and Shared.client.is_connected():
             Shared.client.publish(Shared.pub_status_topic, json.dumps(value))
+            # Also publish dedicated topics for Home Assistant integration
+            Shared.client.publish(f"{Shared.topic_prefix}/last_reset_reason", clean_reason)
+            Shared.client.publish(f"{Shared.topic_prefix}/restart_history", json.dumps(recent_resets))
             Shared.client.publish("homeassistant/local_time/refresh", "refresh")
+            Shared.client.publish(f"{Shared.topic_prefix}/time/refresh", "refresh")
     except Exception as e:
         print(f"send_status: publish failed: {e}")
     Dog.feed()

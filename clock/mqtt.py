@@ -1,3 +1,4 @@
+import json
 import time
 from secrets import secrets  # type: ignore
 
@@ -7,6 +8,7 @@ import microcontroller
 
 import clock.dog as Dog
 import clock.parse as Parse
+import clock.reset_log as ResetLog
 import clock.shared as Shared
 import clock.stats as Stats
 import clock.wifi as Wifi
@@ -20,6 +22,7 @@ mqtt_subs = {
     f"{Shared.topic_prefix}/img": Parse.img,
     "/aio/local_time": Parse.localtime_message,
     "homeassistant/local_time": Parse.localtime_message,
+    f"{Shared.topic_prefix}/time": Parse.localtime_message,
     "/sensor/temperature_outside": Parse.temperature_outside,
 }
 
@@ -77,10 +80,22 @@ def connect(client, userdata, flags, rc):
         print(f"Subscribing to {mqtt_sub}")
         client.subscribe(mqtt_sub)
     Stats.inc_counter("connect")
+
+    # Publish reset reason and recent restart history to Home Assistant immediately upon connect
+    try:
+        reset_reason_val = str(getattr(Shared, "reset_reason", "unknown")).replace("microcontroller.ResetReason.", "")
+        client.publish(f"{Shared.topic_prefix}/last_reset_reason", reset_reason_val, retain=True)
+        recent_resets = ResetLog.get_recent_resets()
+        client.publish(f"{Shared.topic_prefix}/restart_history", json.dumps(recent_resets), retain=True)
+        print(f"Reported reset reason ({reset_reason_val}) to MQTT")
+    except Exception as e:
+        print(f"Error publishing reset reason: {e}")
+
     # Trigger local time refresh immediately upon connection
     try:
         print("Requesting time sync...")
         client.publish("homeassistant/local_time/refresh", "refresh")
+        client.publish(f"{Shared.topic_prefix}/time/refresh", "refresh")
     except Exception as e:
         print(f"Error requesting time refresh: {e}")
 

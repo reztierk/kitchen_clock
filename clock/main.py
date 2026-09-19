@@ -11,16 +11,21 @@ import clock.dog as Dog
 import clock.intervals as Intervals
 import clock.led as Led
 import clock.mqtt as MQTT
+import clock.reset_log as ResetLog
 import clock.shared as Shared
 import clock.stats as Stats
 import clock.wifi as Wifi
 
 reset_reason_str = "UNKNOWN"
+boot_uptime = int(time.monotonic())
 if hasattr(microcontroller, "cpu") and hasattr(microcontroller.cpu, "reset_reason"):
-    reset_reason_str = str(microcontroller.cpu.reset_reason)
+    reset_reason_str = str(microcontroller.cpu.reset_reason).replace("microcontroller.ResetReason.", "")
+    if reset_reason_str == "UNKNOWN" and boot_uptime > 10:
+        reset_reason_str = "SOFT_RELOAD"
     print(f"Board reset reason: {reset_reason_str}")
 Shared.reset_reason = reset_reason_str
 Stats.inc_counter(f"boot_{reset_reason_str}")
+ResetLog.record_reset(reset_reason_str)
 
 Wifi.setup()
 Display.setup()

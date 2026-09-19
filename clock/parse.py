@@ -67,28 +67,88 @@ def blinkrate(_topic, message):
 
 def localtime_message(topic, message):
     # Formats supported:
-    # 1) /aio/local_time or homeassistant/local_time:
-    #    "2021-01-15 23:07:36.339 015 5 -0500 EST"
-    # 2) ISO-8601: "2024-04-16T15:30:00" or "2024-04-16 15:30:00"
+    # 1) Adafruit IO: "2021-01-15 23:07:36.339 015 5 -0500 EST"
+    # 2) Home Assistant / ISO-8601: "2024-04-16T15:30:00-04:00" or with subseconds/Z
+    # 3) Plain datetime string: "2024-04-16 15:30:00"
+    # 4) JSON wrapper: {"datetime": "..."}
+    # 5) Unix epoch integer/float
     try:
         print(f"Local time mqtt: {message}")
         msg = message.strip()
-        times = msg.split(" ")
+        if (msg.startswith('"') and msg.endswith('"')) or (msg.startswith("'") and msg.endswith("'")):
+            msg = msg[1:-1].strip()
+
+        # Handle JSON payload if Home Assistant sends JSON
+        if msg.startswith("{") and msg.endswith("}"):
+            try:
+                data = json.loads(msg)
+                for k in ("datetime", "date_time", "time", "local_time", "state", "value"):
+                    if k in data and isinstance(data[k], str):
+                        msg = data[k].strip()
+                        break
+            except Exception:
+                pass
+
+        # Handle unix timestamp
+        try:
+            val = float(msg)
+            if val > 1000000000:
+                now = time.localtime(int(val))
+                Shared.global_rtc.datetime = now
+                Shared.display_needs_refresh = True
+                Stats.inc_counter("local_time")
+                return
+        except (ValueError, TypeError):
+            pass
+
+        times = msg.split()
         the_date = times[0]
         the_time = times[1] if len(times) > 1 else ""
 
-        if "T" in the_date and not the_time:
-            the_date, the_time = the_date.split("T")
+        if "T" in the_date:
+            parts = the_date.split("T")
+            the_date = parts[0]
+            if not the_time:
+                the_time = parts[1]
 
-        year_day = int(times[2]) if len(times) > 2 else -1
-        week_day = int(times[3]) if len(times) > 3 else -1
-        is_dst = -1
+        year, month, mday = [int(x) for x in the_date.split("-")[:3]]
 
-        year, month, mday = [int(x) for x in the_date.split("-")]
-        the_time = the_time.split(".")[0].split("+")[0].split("Z")[0]
-        hours, minutes, seconds = [int(x) for x in the_time.split(":")]
+        # Clean time: strip subseconds and timezone offsets (+00:00, -04:00, Z)
+        if "." in the_time:
+            the_time = the_time.split(".")[0]
+        for tz_char in ("+", "Z", "z"):
+            if tz_char in the_time:
+                the_time = the_time.split(tz_char)[0]
+        if "-" in the_time:
+            the_time = the_time.split("-")[0]
+
+        time_parts = [int(x) for x in the_time.split(":")[:3]]
+        hours = time_parts[0] if len(time_parts) > 0 else 0
+        minutes = time_parts[1] if len(time_parts) > 1 else 0
+        seconds = time_parts[2] if len(time_parts) > 2 else 0
+
+        # Calculate weekday (0=Mon, 6=Sun) and day of year
+        y = year if month >= 3 else year - 1
+        t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+        week_day = (y + y // 4 - y // 100 + y // 400 + t[month - 1] + mday + 6) % 7
+        days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0):
+            days[1] = 29
+        year_day = sum(days[:month - 1]) + mday
+
+        if len(times) > 2:
+            try:
+                year_day = int(times[2])
+            except ValueError:
+                pass
+        if len(times) > 3:
+            try:
+                week_day = int(times[3])
+            except ValueError:
+                pass
+
         now = time.struct_time(
-            (year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst)
+            (year, month, mday, hours, minutes, seconds, week_day, year_day, -1)
         )
         Shared.global_rtc.datetime = now
         Shared.display_needs_refresh = True
