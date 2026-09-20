@@ -1,7 +1,7 @@
 import gc
 import json
+import os
 import time
-from secrets import secrets  # type: ignore
 
 import adafruit_connection_manager
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
@@ -34,12 +34,16 @@ def getMQTTClient():
     # Initialize MQTT interface with the esp interface
     socket_pool = adafruit_connection_manager.get_radio_socketpool(Shared.esp)
 
+    broker = os.getenv("MQTT_BROKER")
+    if not broker:
+        raise RuntimeError("MQTT_BROKER not set in settings.toml")
+
     # Set up a MiniMQTT Client
     client = MQTT.MQTT(
-        broker=secrets["broker"],
-        port=secrets.get("broker_port") or 1883,
-        username=secrets["broker_user"],
-        password=secrets["broker_pass"],
+        broker=broker,
+        port=int(os.getenv("MQTT_BROKER_PORT") or 1883),
+        username=os.getenv("MQTT_BROKER_USER"),
+        password=os.getenv("MQTT_BROKER_PASS"),
         socket_pool=socket_pool,
         socket_timeout=1.0,
         connect_retries=1,

@@ -1,0 +1,11 @@
+# Copy this file to settings.toml and fill in your own values.
+# https://docs.circuitpython.org/en/latest/docs/environment.html
+
+WIFI_SSID = ""              # your_wifi_ssid
+WIFI_PASSWORD = ""          # your_wifi_password
+MQTT_BROKER = "192.168.1.100"  # your_mqtt_broker
+MQTT_BROKER_PORT = 1883
+MQTT_BROKER_USER = ""       # your_mqtt_broker_username
+MQTT_BROKER_PASS = ""       # your_mqtt_broker_password
+TOPIC_PREFIX = "/matrixportal"  # prefix for device mqtt topics
+ENABLE_DOG = true           # hardware watchdog (set false to disable while debugging)

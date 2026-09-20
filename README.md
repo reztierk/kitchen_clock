@@ -51,11 +51,13 @@ well suited for this project. I had to come up with an adaptor.
 Take a look at [thingiverse 4850550](https://www.thingiverse.com/thing:4850550) for info on
 the brackets I made and printed for the clock, as well as the accessories used.
 
-### secrets.py
+### settings.toml
 
-Make sure to create a file called secrets.py to include info on the wifi as well as the MQTT
-broker you will connect to. Use [**secrets.py.sample**](https://github.com/flavio-fernandes/kitchen_clock/blob/main/secrets.py.sample)
-as reference.
+Make sure to create a file called settings.toml (at the CIRCUITPY drive root) to include info on
+the wifi as well as the MQTT broker you will connect to. Use
+[**settings.toml.sample**](https://github.com/flavio-fernandes/kitchen_clock/blob/main/settings.toml.sample)
+as reference. See the [CircuitPython environment variables docs](https://docs.circuitpython.org/en/latest/docs/environment.html)
+for the file format.
 
 
 ### Removing _all_ files from CIRCUITPY drive
@@ -94,7 +96,7 @@ topic: /aio/local_time  payload: 2021-05-18 23:23:36.339 015 5 -0500 EST
 These are the MQTT topics you can publish to the clock:
 
 ```python
-mqtt_topic = secrets.get("topic_prefix") or "/matrixportal"
+mqtt_topic = os.getenv("TOPIC_PREFIX") or "/matrixportal"
 mqtt_pub_status = f"{mqtt_topic}/status"
 
 mqtt_subs = {

@@ -1,4 +1,4 @@
-from secrets import secrets  # type: ignore
+import os
 
 import board
 import busio
@@ -29,10 +29,14 @@ def setup():
     Shared.esp = adafruit_esp32spi.ESP_SPIcontrol(
         spi, esp32_cs, esp32_ready, esp32_reset
     )
-    # TODO: ESP32WiFiManager is deprecated in favor of WifiManager +
-    # settings.toml (os.getenv); migrate when convenient
-    Shared.wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(
-        Shared.esp, secrets, None, attempts=1
+    # ESPSPI_WiFiManager is deprecated (it just wraps WiFiManager with a
+    # secrets-dict warning); use WiFiManager directly, sourced from settings.toml.
+    Shared.wifi = adafruit_esp32spi_wifimanager.WiFiManager(
+        Shared.esp,
+        os.getenv("WIFI_SSID"),
+        os.getenv("WIFI_PASSWORD"),
+        status_pixel=None,
+        attempts=1,
     )
 
     print("Connecting to WiFi...")

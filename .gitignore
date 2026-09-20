@@ -1,4 +1,5 @@
 secrets.py
+settings.toml
 .env
 .DS_Store
 .vscode

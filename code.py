@@ -1,9 +1,10 @@
 # Enable the hardware watchdog as early as possible so even an import-time
-# hang self-recovers (clock.dog.setup() runs later and honors enable_dog too)
+# hang self-recovers (clock.dog.setup() runs later and honors ENABLE_DOG too)
 try:
-    from secrets import secrets
+    import os
 
-    if secrets.get("enable_dog", True):
+    _enable_dog = os.getenv("ENABLE_DOG")
+    if _enable_dog is None or _enable_dog.strip().lower() not in ("0", "false", "no", "off"):
         from microcontroller import watchdog as wd
         from watchdog import WatchDogMode
 

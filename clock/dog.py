@@ -8,7 +8,7 @@ def setup():
     if Shared.ENABLE_DOG:
         print("--------------------------------------------------------")
         print("IMPORTANT: watch dog is enabled! To disable it, set")
-        print("'enable_dog': False in secrets.py, or do:")
+        print("ENABLE_DOG = false in settings.toml, or do:")
         print("from microcontroller import watchdog as wd ; wd.deinit()")
         print("--------------------------------------------------------")
         wd.timeout = 16  # timeout in seconds (SAMD51 max hardware timeout)
