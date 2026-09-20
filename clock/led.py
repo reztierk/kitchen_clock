@@ -10,3 +10,7 @@ def setup():
     Shared.pixels = pixels
     Shared.pixels[0] = (0, 0, 0)
     Shared.board_led.switch_to_output()
+
+
+def interval_led_blink():
+    Shared.board_led.value = not Shared.board_led.value

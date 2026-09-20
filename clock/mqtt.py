@@ -1,3 +1,4 @@
+import gc
 import json
 import time
 from secrets import secrets  # type: ignore
@@ -5,6 +6,8 @@ from secrets import secrets  # type: ignore
 import adafruit_connection_manager
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import microcontroller
+
+gc.collect()  # compact before clock.parse pulls in displayio/adafruit_display_shapes
 
 import clock.dog as Dog
 import clock.parse as Parse
@@ -100,7 +103,7 @@ def connect(client, userdata, flags, rc):
         print(f"Error requesting time refresh: {e}")
 
 
-last_reconnect_attempt = 0
+last_reconnect_attempt = -10  # allow an immediate first reconnect attempt
 
 
 def reconnect():

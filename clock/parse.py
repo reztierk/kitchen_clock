@@ -6,6 +6,7 @@ import displayio
 from adafruit_display_shapes.line import Line
 
 import clock.display as Display
+import clock.led as Led
 import clock.shared as Shared
 import clock.stats as Stats
 
@@ -23,7 +24,7 @@ def brightness(topic, message):
 
 def neopixel(_topic, message):
     try:
-        value = int(message)
+        value = int(message, 0)  # accepts decimal and 0x-prefixed hex
     except ValueError as e:
         print(f"bad neo value: {e}")
         return
@@ -51,7 +52,7 @@ def blinkrate(_topic, message):
 
     if value:
         Shared.TS_INTERVALS[Shared.LED_BLINK] = Shared.TS(
-            value, Shared.interval_led_blink
+            value, Led.interval_led_blink
         )
         Shared.tss[Shared.LED_BLINK] = None
     else:
@@ -143,7 +144,8 @@ def localtime_message(topic, message):
                 pass
         if len(times) > 3:
             try:
-                week_day = int(times[3])
+                # AIO sends strftime %w (Sunday=0); convert to Monday=0
+                week_day = (int(times[3]) - 1) % 7
             except ValueError:
                 pass
 
@@ -170,7 +172,10 @@ def msg_message(topic, message):
     print(f"msg_message: {message}")
     Stats.inc_counter("msg_message")
     try:
-        Shared.msg_state = json.loads(message)
+        msg_state = json.loads(message)
+        if not isinstance(msg_state, dict):
+            raise ValueError("payload is not an object")
+        Shared.msg_state = msg_state
     except ValueError:
         Shared.msg_state = {"msg": message, "timeout": 20}
 
@@ -182,7 +187,10 @@ def msg_message(topic, message):
     # timeout
     timeout = Shared.msg_state.get("timeout")
     if timeout is not None:
-        Shared.msg_state["timeout"] = int(timeout)
+        try:
+            Shared.msg_state["timeout"] = int(timeout)
+        except (ValueError, TypeError):
+            Shared.msg_state["timeout"] = 20
 
     color = Shared.msg_state.get("text_color") or Shared.msg_state.get("color")
     if color:
@@ -210,6 +218,13 @@ def msg_message(topic, message):
         except Exception as e:
             print(f"Failed to parse position {x_position}: {e}")
 
+    # NOTE: relies on MatrixPortal/PortalBase internals (_text,
+    # _scrolling_index, _get_next_scrollable_text_index); validated against
+    # adafruit_matrixportal 3.2.12 + adafruit_portalbase 3.5.2
+    #
+    # Scrollable text starts offscreen at the display's right edge, so keep
+    # a left-center anchor there; otherwise preserve the label's top-left
+    # anchor from setup so the date row keeps its configured y.
     Shared.matrixportal._text[Shared.MSG_TXT_IDX]["scrolling"] = scrolling
     if Shared.matrixportal._scrolling_index is None and scrolling:
         Shared.matrixportal._scrolling_index = (
@@ -217,6 +232,8 @@ def msg_message(topic, message):
         )
 
     Shared.matrixportal._text[Shared.MSG_TXT_IDX]["position"] = text_position
+    if scrolling:
+        Shared.matrixportal._text[Shared.MSG_TXT_IDX]["anchor_point"] = (0, 0.5)
     Shared.matrixportal.set_text(
         val=Shared.msg_state.get("msg"), index=Shared.MSG_TXT_IDX
     )
@@ -231,10 +248,33 @@ def img(_topic, message=""):
     Stats.inc_counter("img_message")
     try:
         img_params = json.loads(message)
+        if not isinstance(img_params, dict):
+            img_params = {"img": str(img_params), "timeout": 20}
     except ValueError:
         img_params = {"img": message, "timeout": 20}
 
-    if Shared.img_index:
+    # Resolve the file first so a bad name leaves the current image untouched
+    filename = None
+    img_name = img_params.get("img")
+    if img_name:
+        img_name = str(img_name)
+        for candidate in (
+            "bmps/" + img_name + ".bmp",
+            "bmps/" + img_name,
+            img_name,
+            img_name + ".bmp",
+        ):
+            try:
+                os.stat(candidate)
+                filename = candidate
+                break
+            except OSError:
+                pass
+        if filename is None:
+            print(f"image not found: {img_name}")
+            return
+
+    if Shared.img_index is not None:
         del Shared.matrixportal.splash[Shared.img_index]
         Shared.img_index = None
 
@@ -244,21 +284,10 @@ def img(_topic, message=""):
 
     Shared.img_state.clear()
 
-    if not img_params.get("img"):
+    if not img_name:
         Shared.display_needs_refresh = True
         return
 
-    for filename in (
-        "bmps/" + img_params["img"] + ".bmp",
-        "bmps/" + img_params["img"],
-        img_params["img"],
-        img_params["img"] + ".bmp",
-    ):
-        try:
-            os.stat(filename)
-            break
-        except OSError:
-            pass
     print(f"opening image: {filename}")
     Shared.img_state["img_file"] = open(filename, "rb")
     img_bitmap = displayio.OnDiskBitmap(Shared.img_state["img_file"])
@@ -279,7 +308,10 @@ def img(_topic, message=""):
     # timeout
     timeout = img_params.get("timeout")
     if timeout is not None:
-        Shared.img_state["timeout"] = int(timeout)
+        try:
+            Shared.img_state["timeout"] = int(timeout)
+        except (ValueError, TypeError):
+            Shared.img_state["timeout"] = 20
 
     img_only = img_params.get("img_only")
     if img_only is not None:

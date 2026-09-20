@@ -21,6 +21,9 @@ pixels = neopixel.NeoPixel(pixel_pin, 1, auto_write=True)
 pixels.fill((0, 0, 255))
 time.sleep(3)
 pixels.fill((0, 0, 0))
+# Release the pin so led.setup() can re-create the NeoPixel without
+# an intermittent "NEOPIXEL in use" error
+pixels.deinit()
 
 # Button is False when pressed
 buttons_pressed = 0
@@ -43,3 +46,7 @@ if not buttons_pressed:
     storage.disable_usb_drive()
     usb_cdc.enable(console=True, data=False)
     usb_hid.disable()
+
+# Release button pins so they can be reused by user code
+for button in buttons:
+    button.deinit()

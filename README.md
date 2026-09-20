@@ -14,28 +14,32 @@ project.
 
 ### Libraries
 
-**Adafruit_CircuitPython_MiniMQTT**: Using commit [407bb4f](https://github.com/adafruit/Adafruit_CircuitPython_MiniMQTT/commit/407bb4f43c0e46c5bcaceccf01481ab9690d6ce3)
+Designed for **CircuitPython 10.3.1** on the MatrixPortal M4 (see boot_out.txt for the
+firmware currently in use). The following libraries are **frozen into the 10.3.1 firmware**
+for this board, so they are intentionally not bundled in [lib/](lib):
 
-**Adafruit_CircuitPython_MatrixPortal**: Baseline from commit [6f1d9d4](https://github.com/adafruit/Adafruit_CircuitPython_MatrixPortal/commit/6f1d9d4b7af347cc94a47d379c8bb1f286a2d7b6)
-and removing all the code I did not need.
-
-Besides the 2 libraries above, this project uses the following awesome libraries from the
-[bundle 7.x 20220730](https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/tag/20220730):
 ```
-Found device at /Volumes/CIRCUITPY, running CircuitPython 7.3.2.
-- adafruit_bitmap_font==1.5.8
-- adafruit_bus_device==5.2.0
-- adafruit_display_shapes==2.5.1
-- adafruit_display_text==2.22.7
-- adafruit_esp32spi==5.0.0
-- adafruit_logging==4.1.3
-- adafruit_minimqtt==0.0.0-auto.0
-- adafruit_pixelbuf==1.1.5
-- adafruit_requests==1.12.4
-- neopixel==6.3.3
+adafruit_connection_manager, adafruit_esp32spi, adafruit_portalbase,
+adafruit_requests, neopixel
 ```
 
-But you can probably use newer versions of the 7.x bundle.
+The libraries in [lib/](lib) come from the
+[10.x mpy bundle](https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/latest)
+(bundle release 20260919):
+
+```
+adafruit_bitmap_font==2.4.3
+adafruit_bus_device==5.2.17
+adafruit_display_shapes==2.10.6
+adafruit_display_text==5.0.5
+adafruit_matrixportal==3.2.12
+adafruit_minimqtt==8.1.0
+```
+
+Note: the code reaches into MatrixPortal/PortalBase internals (`_text`, `_scrolling_index`,
+`_get_next_scrollable_text_index`); this was validated against matrixportal 3.2.12 with
+portalbase 3.5.2 (frozen). If you upgrade those libraries, re-test text positioning and
+scrolling.
 
 ### Hardware
 
@@ -78,7 +82,7 @@ $  [ -d /Volumes/CIRCUITPY/ ] && \
 
 Once MQTT is connected, this code expects an MQTT message to be sent
 to it -- at least once -- so it can learn what the local time is.
-See [**_parse_localtime_message()**](https://github.com/flavio-fernandes/kitchen_clock/blob/main/kitchen_clock.py#L266)
+See [**localtime_message()**](https://github.com/flavio-fernandes/kitchen_clock/blob/main/clock/parse.py)
 for an example of what that looks like
 
 ```text
@@ -135,7 +139,7 @@ mosquitto_pub -h $MQTT -t "${PREFIX}/blinkrate" -m 0.1  ; # 100ms
 mosquitto_pub -h $MQTT -t "${PREFIX}/msg" -m foo
 
 mosquitto_pub -h $MQTT -t "${PREFIX}/msg" -m \
-  '{"msg": "hello", "text_color": "#0x595dff", "timeout": 40, "x": "center"}'
+  '{"msg": "hello", "text_color": "#595dff", "timeout": 40, "x": "center"}'
 
 mosquitto_pub -h $MQTT -t "${PREFIX}/msg" -m \
   '{"msg": "hi", "no_scroll": "True", "x": -10}'

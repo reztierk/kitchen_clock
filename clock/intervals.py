@@ -94,8 +94,9 @@ def advance_img():
 
 def scroll_msg():
     if not Shared.img_state and Shared.matrixportal._scrolling_index is not None:
-        # Scroll the text block, but only if there is work
-        # There is an explicit in a less frequent interval (one_sec_tick)
+        # Scroll the text block, but only if there is work.
+        # interval_one_sec() also calls scroll() as a slower fallback;
+        # this faster tick keeps scrolling smooth.
         Shared.matrixportal.scroll()
 
 
@@ -131,10 +132,6 @@ def interval_send_status():
         print(f"send_status: publish failed: {e}")
     Dog.feed()
     gc.collect()
-
-
-def interval_led_blink():
-    Shared.board_led.value = not Shared.board_led.value
 
 
 def setup(intervals):
