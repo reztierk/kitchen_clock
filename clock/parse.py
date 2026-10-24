@@ -66,6 +66,23 @@ def blinkrate(_topic, message):
     Stats.inc_counter("blink")
 
 
+def _set_rtc(now):
+    # Log how far the RTC had drifted from the authoritative time so a fast/slow
+    # clock is visible in the serial log and the status counters.
+    try:
+        drift = time.mktime(Shared.global_rtc.datetime) - time.mktime(now)
+    except Exception:
+        drift = None
+    Shared.global_rtc.datetime = now
+    Shared.display_needs_refresh = True
+    Stats.inc_counter("local_time")
+    if drift is not None:
+        Shared.time_drift = drift
+        if abs(drift) >= 2:
+            print(f"RTC drift corrected: {drift:+d}s")
+            Stats.inc_counter("time_drift")
+
+
 def localtime_message(topic, message):
     # Formats supported:
     # 1) Adafruit IO: "2021-01-15 23:07:36.339 015 5 -0500 EST"
@@ -94,10 +111,7 @@ def localtime_message(topic, message):
         try:
             val = float(msg)
             if val > 1000000000:
-                now = time.localtime(int(val))
-                Shared.global_rtc.datetime = now
-                Shared.display_needs_refresh = True
-                Stats.inc_counter("local_time")
+                _set_rtc(time.localtime(int(val)))
                 return
         except (ValueError, TypeError):
             pass
@@ -152,9 +166,7 @@ def localtime_message(topic, message):
         now = time.struct_time(
             (year, month, mday, hours, minutes, seconds, week_day, year_day, -1)
         )
-        Shared.global_rtc.datetime = now
-        Shared.display_needs_refresh = True
-        Stats.inc_counter("local_time")
+        _set_rtc(now)
     except Exception as e:
         print("Error in _parse_localtime_message -", e)
         Stats.inc_counter("local_time_failed")

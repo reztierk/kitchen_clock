@@ -81,6 +81,14 @@ def interval_one_sec():
         gc.collect()
 
 
+def request_time_sync():
+    # The RTC is only as accurate as the last sync, so refresh regularly to bound
+    # any drift to a few minutes.
+    if Shared.client and Shared.client.is_connected():
+        Shared.client.publish("homeassistant/local_time/refresh", "refresh")
+        Shared.client.publish(f"{Shared.topic_prefix}/time/refresh", "refresh")
+
+
 def advance_img():
     if not Shared.img_state or not Shared.matrixportal.display.brightness:
         return
@@ -115,6 +123,7 @@ def interval_send_status():
         "brightness": Shared.matrixportal.display.brightness,
         "ip": str(ip),
         "counters": str(Shared.counters),
+        "time_drift": Shared.time_drift,
         "mem_free": gc.mem_free(),
         "reset_reason": clean_reason,
         "recent_resets": recent_resets,

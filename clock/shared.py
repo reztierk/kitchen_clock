@@ -52,3 +52,4 @@ board_led = digitalio.DigitalInOut(board.L)  # Or board.D13
 topic_prefix = os.getenv("TOPIC_PREFIX") or "/matrixportal"
 pub_status_topic = f"{topic_prefix}/status"
 reset_reason = None
+time_drift = None  # seconds the RTC was off at the last time sync

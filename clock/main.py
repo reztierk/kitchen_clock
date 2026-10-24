@@ -63,6 +63,7 @@ Intervals.setup(
         Shared.LED_BLINK: Shared.TS(
             Shared.LED_BLINK_DEFAULT, Led.interval_led_blink
         ),  # may be overridden via mqtt
+        "time_sync": Shared.TS(5 * 60, Intervals.request_time_sync),
         "1sec": Shared.TS(1, Intervals.interval_one_sec),
         "decasec": Shared.TS(0.1, Intervals.interval_one_decasec),
     }
