@@ -191,3 +191,15 @@ done
 
 mosquitto_pub -h $MQTT -t "${PREFIX}/img" -n ; # clear
 ```
+
+### Animation images
+
+Animations are vertical strips of 32px-high frames in `bmps/`. Keep them small
+by storing them as palette (indexed) BMPs; `displayio.OnDiskBitmap` streams
+4-bit and 8-bit indexed BMPs directly from flash. 24-bit BMPs are 6x larger.
+
+```sh
+pip install Pillow
+python tools/convert_bmps.py bmps/new.bmp          # in place, max 16 colors (4-bit)
+python tools/convert_bmps.py -c 64 -o out/ in.png  # up to 256 colors (8-bit)
+```
