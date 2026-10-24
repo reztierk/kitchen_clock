@@ -60,6 +60,23 @@ as reference. See the [CircuitPython environment variables docs](https://docs.ci
 for the file format.
 
 
+### Web dashboard
+
+[dashboard/](dashboard) is a small web app (FastAPI + MQTT bridge, packaged in Docker) for controlling
+the clock from a browser: brightness, ambient color, messages, animations, raw
+publish, plus the clock's live status and an MQTT message log. It runs on your server/LAN
+(not on the clock) and connects to the same broker.
+
+```bash
+cd dashboard
+cp .env.sample .env      # same names as settings.toml; set MQTT_BROKER etc.
+docker compose up -d --build
+# open http://localhost:8080  (change with DASHBOARD_PORT in .env)
+```
+
+The dashboard has no authentication of its own, so keep it on a trusted network or put it behind
+a reverse proxy. It only publishes under `TOPIC_PREFIX`.
+
 ### Removing _all_ files from CIRCUITPY drive
 
 ```
@@ -76,7 +93,7 @@ for the file format.
 $  cd ${THIS_REPO_DIR}
 $  [ -d /Volumes/CIRCUITPY/ ] && \
    rm -rf /Volumes/CIRCUITPY/* && \
-   (tar czf - *) | ( cd /Volumes/CIRCUITPY ; tar xzvf - ) && \
+   (tar czf - --exclude=dashboard *) | ( cd /Volumes/CIRCUITPY ; tar xzvf - ) && \
    echo ok || echo not_okay
 ```
 
