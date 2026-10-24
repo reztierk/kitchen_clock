@@ -16,6 +16,8 @@ import clock.shared as Shared
 import clock.stats as Stats
 import clock.wifi as Wifi
 
+SOCKET_TIMEOUT = 0.02  # seconds; also the timeout to pass to client.loop()
+
 mqtt_subs = {
     f"{Shared.topic_prefix}/ping": Parse.ping,
     f"{Shared.topic_prefix}/brightness": Parse.brightness,
@@ -45,7 +47,11 @@ def getMQTTClient():
         username=os.getenv("MQTT_BROKER_USER"),
         password=os.getenv("MQTT_BROKER_PASS"),
         socket_pool=socket_pool,
-        socket_timeout=1.0,
+        # Every client.loop() blocks for at least this long waiting on the
+        # socket, and stalls animation/scrolling while it does, so keep it
+        # short. It must be >0: 0 makes the socket non-blocking and
+        # minimqtt then spins for recv_timeout instead of returning.
+        socket_timeout=SOCKET_TIMEOUT,
         connect_retries=1,
     )
 

@@ -20,7 +20,7 @@ def interval_one_sec():
     # Process MQTT messages
     try:
         if Shared.client and Shared.client.is_connected():
-            Shared.client.loop(timeout=1.0)
+            Shared.client.loop(timeout=MQTT.SOCKET_TIMEOUT)
         elif Shared.client:
             MQTT.reconnect()
     except Exception as e:
