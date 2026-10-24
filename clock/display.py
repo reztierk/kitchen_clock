@@ -89,7 +89,7 @@ def setup():
     Shared.matrixportal.add_text(
         text_font=Shared.TIME_FONT,
         text_position=(Shared.MSG_POS[Shared.MSG_TIME_IDX][0], 3),
-        text_color=0xFFFFFF,
+        text_color=Shared.TIME_COLOR_DEFAULT,
         text_anchor_point=(0, 0),
     )
     Shared.matrixportal.preload_font(b"0123456789:")
@@ -203,6 +203,11 @@ def main():
     if "local_time" not in Shared.counters:
         set_text_center(str(int(time.monotonic())), Shared.MSG_TIME_IDX)
         return
+
+    # Lazy import: loading it any earlier fragments the tight heap (see main.py)
+    import clock.ambient as Ambient
+
+    Ambient.update(now)
 
     if Shared.cached_mins == now.tm_min and not Shared.display_needs_refresh:
         return

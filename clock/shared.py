@@ -16,6 +16,8 @@ def _getenv_bool(key, default):
 
 
 ENABLE_DOG = _getenv_bool("ENABLE_DOG", True)
+AMBIENT_COLOR = _getenv_bool("AMBIENT_COLOR", True)
+TIME_COLOR_DEFAULT = 0xFFFFFF  # used when the ambient schedule is disabled
 MSG_TIME_IDX = 0
 MSG_TXT_IDX = 1
 MSG_POS = [(0, 5), (0, 26)]
@@ -37,6 +39,11 @@ img_index = None
 seconds_line = None
 seconds_index = None
 pixels = None
+ambient_enabled = AMBIENT_COLOR  # runtime toggle, see the /ambient topic
+ambient_mode = "auto" if AMBIENT_COLOR else "off"  # auto, off or override (for status)
+ambient_override = None  # packed color pinned via mqtt, wins over the schedule
+ambient_preview = None  # minute of day while sweeping the schedule, else None
+ambient_color = None  # color currently applied to both the time digits and seconds bar
 
 dog_is_enabled = False
 display_needs_refresh = True

@@ -9,3 +9,4 @@ MQTT_BROKER_USER = ""       # your_mqtt_broker_username
 MQTT_BROKER_PASS = ""       # your_mqtt_broker_password
 TOPIC_PREFIX = "/matrixportal"  # prefix for device mqtt topics
 ENABLE_DOG = true           # hardware watchdog (set false to disable while debugging)
+AMBIENT_COLOR = true        # shift time/seconds-bar color through the day (false = white)

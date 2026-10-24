@@ -104,6 +104,7 @@ mqtt_subs = {
     f"{mqtt_topic}/brightness": _parse_brightness,
     f"{mqtt_topic}/neopixel": _parse_neopixel,
     f"{mqtt_topic}/blinkrate": _parse_blinkrate,
+    f"{mqtt_topic}/ambient": _parse_ambient,
     f"{mqtt_topic}/msg": _parse_msg_message,
     f"{mqtt_topic}/img": _parse_img,
     "/aio/local_time": _parse_localtime_message,
@@ -136,6 +137,15 @@ mosquitto_pub -h $MQTT -t "${PREFIX}/neopixel" -m 0xff0000 ; # red
 # On board led blink
 mosquitto_pub -h $MQTT -t "${PREFIX}/blinkrate" -m 0    ; # off
 mosquitto_pub -h $MQTT -t "${PREFIX}/blinkrate" -m 0.1  ; # 100ms
+
+# Ambient color: the time digits and seconds bar shift color through the day
+# (dim amber at night, warm at sunrise/sunset, cool white at midday).
+# The schedule lives in clock/ambient.py. Set AMBIENT_COLOR = false in
+# settings.toml to start with plain white instead.
+mosquitto_pub -h $MQTT -t "${PREFIX}/ambient" -m preview   ; # sweep a full day in 30s
+mosquitto_pub -h $MQTT -t "${PREFIX}/ambient" -m 0xFFA040  ; # pin a color
+mosquitto_pub -h $MQTT -t "${PREFIX}/ambient" -m off       ; # plain white
+mosquitto_pub -h $MQTT -t "${PREFIX}/ambient" -m auto      ; # back to the schedule
 
 # Messages
 mosquitto_pub -h $MQTT -t "${PREFIX}/msg" -m foo

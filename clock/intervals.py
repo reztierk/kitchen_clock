@@ -125,6 +125,7 @@ def interval_send_status():
         "counters": str(Shared.counters),
         "time_drift": Shared.time_drift,
         "mem_free": gc.mem_free(),
+        "ambient": Shared.ambient_mode,
         "reset_reason": clean_reason,
         "recent_resets": recent_resets,
     }

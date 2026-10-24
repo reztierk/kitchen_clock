@@ -37,6 +37,12 @@ import clock.stats as Stats
 gc.collect()
 import clock.wifi as Wifi
 gc.collect()
+import clock.ambient as Ambient
+gc.collect()
+# Registered here (not in clock/mqtt.py) so the heap-sensitive parse/mqtt
+# modules stay as small as possible; must happen before MQTT.setup() subscribes.
+MQTT.mqtt_subs[f"{Shared.topic_prefix}/ambient"] = Ambient.handle_message
+gc.collect()
 
 reset_reason_str = "UNKNOWN"
 boot_uptime = int(time.monotonic())
